@@ -1,6 +1,9 @@
 package com.kxhospital.cockpit.ds;
 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -14,12 +17,24 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @Configuration
 @EnableCaching
 public class DsCacheConfig {
 
     @Bean
-    public RedisCacheManager dsCacheManager(RedisConnectionFactory factory) {
+    public CacheManager cacheManager(RedisConnectionFactory factory) {
+        try {
+            factory.getConnection().close();
+            log.info(">>> Redis 连接成功，启用 Redis 缓存");
+        } catch (Exception e) {
+            log.warn(">>> Redis 不可用 ({}), 降级为本地内存缓存", e.getMessage());
+            return new ConcurrentMapCacheManager(
+                "dsRegions", "dsTasks", "dsStatTrend", "dsStatSummary",
+                "dsProvince", "dsCity", "dsOrgs"
+            );
+        }
+
         RedisCacheConfiguration base = RedisCacheConfiguration.defaultCacheConfig()
                 .serializeKeysWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(new StringRedisSerializer()))
